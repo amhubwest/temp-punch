@@ -58,11 +58,10 @@
   .fw-bar .t { font-size:16px; font-weight:700; }
   .fw-bar a { color:#fff; font-size:14px; font-weight:600; text-decoration:none; background:rgba(255,255,255,.16); border-radius:8px; padding:7px 13px; cursor:pointer; }
   #fwFrame { flex:1; width:100%; border:0; background:#fff; }
-  #fwBanner { text-align:center; font-size:13px; padding:10px 12px; line-height:1.4; }
-  #fwBanner.instruct { background:#fdf0e2; color:#8a4b12; border-bottom:1px solid #f3ddc2; }
-  #fwBanner.instruct a { color:var(--teal-dark); }
-  #fwBanner.done { background:#e4f6f7; color:var(--teal-dark); border-bottom:1px solid #c4e9ec; font-weight:600; }
-  .fw-bar a.done { background:var(--teal); }
+  #fwBanner { text-align:center; font-size:13px; padding:9px 10px; line-height:1.55; background:#fdf0e2; color:#8a4b12; border-bottom:1px solid #f3ddc2; }
+  #fwBanner .stp { white-space:nowrap; margin:0 5px; }
+  #fwBanner .n { display:inline-block; width:17px; height:17px; line-height:17px; border-radius:50%; background:var(--teal); color:#fff; font-weight:800; font-size:11px; text-align:center; vertical-align:1px; }
+  #fwBanner a { color:var(--teal-dark); font-size:12px; }
 
   #err { display:none; background:#fdecea; color:#b3261e; border:1px solid #f5c6c2; border-radius:9px; font-size:13.5px; padding:11px 13px; margin-bottom:14px; line-height:1.4; }
 </style>
@@ -100,7 +99,7 @@
 <!-- Embedded form -->
 <div id="formWrap" class="hidden">
   <div class="fw-bar"><span class="t" id="fwTitle"></span><a id="fwClose">Close &#10005;</a></div>
-  <div id="fwBanner" class="instruct"></div>
+  <div id="fwBanner"><span class="stp"><span class="n">1</span> Tap <b>Submit</b> at the bottom &#11015;</span><span class="stp"><span class="n">2</span> See the &#10003;, then tap <b>Close</b> up top</span><br><a id="fwDirect" target="_blank" rel="noopener">Form not loading?</a></div>
   <iframe id="fwFrame" src="about:blank" title="Punch form"></iframe>
 </div>
 
@@ -209,34 +208,15 @@ function openForm(type){
     return;
   }
   const url = formUrl(identity.name, type);
-  fwLoads = 0; fwOpenedAt = Date.now();
-  setBanner('instruct');
   $('fwTitle').textContent = type + ' — ' + identity.name.split(' ')[0];
   $('fwFrame').src = url + '&embed=true';
   $('fwDirect').href = url;
   $('formWrap').classList.remove('hidden');
   try { localStorage.setItem('tpLast', JSON.stringify({ type, day: todayKey() })); } catch(_){}
 }
-let fwLoads = 0, fwOpenedAt = 0;
-function setBanner(state){
-  const b = $('fwBanner');
-  b.className = state;
-  b.innerHTML = state === 'done'
-    ? '&#10003; Punch submitted &mdash; tap <b>Close &#10005;</b> (top right) to finish'
-    : 'Your name &amp; punch are filled in &mdash; scroll down and tap <b>Submit</b> at the bottom &#11015; &nbsp;<a id="fwDirect" target="_blank" rel="noopener">Form not loading?</a>';
-}
-$('fwFrame').addEventListener('load', () => {
-  fwLoads++;
-  if (fwLoads >= 2 && Date.now() - fwOpenedAt > 4000){
-    setBanner('done');
-    $('fwClose').classList.add('done');
-  }
-});
 function closeForm(){
   $('formWrap').classList.add('hidden');
   $('fwFrame').src = 'about:blank';
-  $('fwClose').classList.remove('done');
-  fwLoads = 0;
   renderPunch();
 }
 
