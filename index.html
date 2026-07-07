@@ -52,15 +52,14 @@
   .switch { text-align:center; margin-top:14px; }
   .switch a { font-size:13px; color:#948d7b; text-decoration:underline; cursor:pointer; }
 
-  /* ---- Confirm sheet ---- */
-  #overlay { position:fixed; inset:0; background:rgba(5,25,49,.5); display:flex; align-items:flex-end; justify-content:center; z-index:10; }
-  #sheet { background:#fff; width:100%; max-width:460px; border-radius:18px 18px 0 0; padding:24px 20px 30px; }
-  #sheet h3 { font-size:18px; text-align:center; color:var(--navy-deep); }
-  #sheet .at { text-align:center; font-size:14px; color:#6b6557; margin:6px 0 8px; }
-  #sheet .note { text-align:center; font-size:12.5px; color:#948d7b; margin-bottom:18px; line-height:1.4; }
-  .btn-navy { background:var(--navy); color:#fff; }
-  .btn-navy:active { background:var(--navy-deep); }
-  .btn-ghost { background:#fff; color:#6b6557; border:1.5px solid #d5cdba; margin-top:10px; }
+  /* ---- Embedded form overlay ---- */
+  #formWrap { position:fixed; inset:0; background:#fff; z-index:20; display:flex; flex-direction:column; }
+  .fw-bar { background:var(--navy-deep); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:13px 16px; }
+  .fw-bar .t { font-size:16px; font-weight:700; }
+  .fw-bar a { color:#fff; font-size:14px; font-weight:600; text-decoration:none; background:rgba(255,255,255,.16); border-radius:8px; padding:7px 13px; cursor:pointer; }
+  #fwFrame { flex:1; width:100%; border:0; background:#fff; }
+  .fw-hint { background:#fff; border-top:1px solid var(--line); text-align:center; font-size:12.5px; color:#6b6557; padding:9px 12px; }
+  .fw-hint a { color:var(--teal-dark); }
 
   #err { display:none; background:#fdecea; color:#b3261e; border:1px solid #f5c6c2; border-radius:9px; font-size:13.5px; padding:11px 13px; margin-bottom:14px; line-height:1.4; }
 </style>
@@ -95,15 +94,11 @@
   </section>
 </main>
 
-<!-- Confirm -->
-<div id="overlay" class="hidden">
-  <div id="sheet">
-    <h3 id="sheetType"></h3>
-    <div class="at" id="sheetAt"></div>
-    <div class="note">Your name &amp; punch are filled in on the next page &mdash; just tap <b>Submit</b> there.</div>
-    <button class="btn btn-navy" id="confirmBtn">Continue</button>
-    <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
-  </div>
+<!-- Embedded form -->
+<div id="formWrap" class="hidden">
+  <div class="fw-bar"><span class="t" id="fwTitle"></span><a id="fwClose">Close &#10005;</a></div>
+  <iframe id="fwFrame" src="about:blank" title="Punch form"></iframe>
+  <div class="fw-hint">Your name &amp; punch are already filled in &mdash; just tap <b>Submit</b>. &nbsp;<a id="fwDirect" target="_blank" rel="noopener">Form not loading?</a></div>
 </div>
 
 <script>
@@ -132,7 +127,6 @@ const PUNCHES = [
 const $ = id => document.getElementById(id);
 const err = $('err');
 let identity = null;     // { name, id }
-let pendingType = null;
 
 /* ---------- identity ---------- */
 function loadIdentity(){
@@ -178,7 +172,7 @@ function renderPunch(){
     const b = document.createElement('button');
     b.className = 'punch-btn' + (p.type === sug ? ' suggested' : '');
     b.innerHTML = '<span class="ic">' + p.ic + '</span><span><span class="pt">' + p.type + '</span><br><span class="ps">' + p.sub + '</span></span>';
-    b.onclick = () => openConfirm(p.type);
+    b.onclick = () => openForm(p.type);
     wrap.appendChild(b);
   });
   show('punch');
@@ -196,35 +190,32 @@ function configured(){
   return /^https?:\/\//.test(PREFILL_SAMPLE) && PREFILL_SAMPLE.indexOf('NAMEHERE') > -1;
 }
 
-/* ---------- confirm & submit ---------- */
-function nowStr(){ return new Date().toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }); }
-function openConfirm(type){
-  pendingType = type;
-  $('sheetType').textContent = type + '?';
-  $('sheetAt').textContent = identity.name + ' \u00B7 ' + nowStr();
-  $('overlay').classList.remove('hidden');
-}
-function closeConfirm(){ $('overlay').classList.add('hidden'); pendingType = null; }
-
-function submitPunch(){
-  const type = pendingType;
+/* ---------- embedded form ---------- */
+function openForm(type){
   err.style.display = 'none';
   if (!configured()){
-    closeConfirm();
     err.textContent = 'This page is not connected to the form yet — paste the pre-filled form URL into PREFILL_SAMPLE (see build guide).';
     err.style.display = 'block';
     window.scrollTo(0,0);
     return;
   }
   if (!navigator.onLine){
-    closeConfirm();
     err.textContent = 'Your phone looks offline — reconnect and try again, or tell your supervisor the time so it can be entered manually.';
     err.style.display = 'block';
     window.scrollTo(0,0);
     return;
   }
+  const url = formUrl(identity.name, type);
+  $('fwTitle').textContent = type + ' — ' + identity.name.split(' ')[0];
+  $('fwFrame').src = url + '&embed=true';
+  $('fwDirect').href = url;
+  $('formWrap').classList.remove('hidden');
   try { localStorage.setItem('tpLast', JSON.stringify({ type, day: todayKey() })); } catch(_){}
-  location.href = formUrl(identity.name, type);
+}
+function closeForm(){
+  $('formWrap').classList.add('hidden');
+  $('fwFrame').src = 'about:blank';
+  renderPunch();
 }
 
 /* ---------- wiring ---------- */
@@ -246,9 +237,7 @@ $('switchUser').onclick = () => {
   identity = null; $('fn').value = ''; $('ln').value = '';
   show('register');
 };
-$('confirmBtn').onclick = submitPunch;
-$('cancelBtn').onclick  = closeConfirm;
-$('overlay').onclick = e => { if (e.target === $('overlay')) closeConfirm(); };
+$('fwClose').onclick = closeForm;
 
 loadIdentity();
 identity ? renderPunch() : show('register');
