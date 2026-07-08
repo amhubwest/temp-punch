@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#0e2440">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Time Clock">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Temp Time Clock — AM-HUB West</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,6 +71,12 @@
   #fwBanner a { color:var(--teal-dark); font-size:12px; }
 
   #err { display:none; background:#fdecea; color:#b3261e; border:1px solid #f5c6c2; border-radius:9px; font-size:13.5px; padding:11px 13px; margin-bottom:14px; line-height:1.4; }
+
+  /* ---- install prompts ---- */
+  #iosInstall { display:flex; align-items:center; gap:10px; justify-content:center; background:var(--navy); color:#fff; font-size:12.5px; padding:9px 14px; line-height:1.35; }
+  #iosInstall a { color:#fff; font-size:15px; text-decoration:none; opacity:.75; padding:0 4px; cursor:pointer; }
+  #installBtn { position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:15; background:var(--teal); color:#fff; border:none; border-radius:999px; font-size:14.5px; font-weight:700; padding:12px 22px; box-shadow:0 4px 14px rgba(3,174,188,.4); cursor:pointer; display:none; align-items:center; gap:8px; }
+  #installBtn svg { vertical-align:-2px; }
 </style>
 </head>
 <body>
@@ -73,6 +86,11 @@
   <h1>TEMP <span>TIME CLOCK</span></h1>
 </header>
 <div class="brandbar"></div>
+
+<div id="iosInstall" class="hidden">
+  <span>Add this to your home screen: tap <b>Share</b> <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 12v7a1 1 0 001 1h10a1 1 0 001-1v-7"/></svg> then <b>Add to Home Screen</b></span>
+  <a id="iosDismiss">&#10005;</a>
+</div>
 
 <main>
   <div id="err"></div>
@@ -102,6 +120,8 @@
   <div id="fwBanner"><span class="stp"><span class="n">1</span> Tap <b>Submit</b> at the bottom &#11015;</span><span class="stp"><span class="n">2</span> See the &#10003;, then tap <b>Close</b> up top</span><br><a id="fwDirect" target="_blank" rel="noopener">Form not loading?</a></div>
   <iframe id="fwFrame" src="about:blank" title="Punch form"></iframe>
 </div>
+
+<button id="installBtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> Add to home screen</button>
 
 <script>
 /* ================= CONFIG =================
@@ -240,6 +260,36 @@ $('switchUser').onclick = () => {
   show('register');
 };
 $('fwClose').onclick = closeForm;
+
+/* ---------- PWA install ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+if (!standalone) {
+  // Android / Chrome: real install button
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferred = e;
+    const b = $('installBtn'); b.style.display = 'inline-flex';
+    b.onclick = async () => { b.style.display = 'none'; deferred.prompt(); await deferred.userChoice; deferred = null; };
+  });
+  // iOS Safari: no prompt event — show the Share hint once
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('tpIosHint') === '1'; } catch(_){}
+  if (isSafari && !dismissed) {
+    $('iosInstall').classList.remove('hidden');
+    $('iosDismiss').onclick = () => {
+      $('iosInstall').classList.add('hidden');
+      try { localStorage.setItem('tpIosHint', '1'); } catch(_){}
+    };
+  }
+}
 
 loadIdentity();
 identity ? renderPunch() : show('register');
